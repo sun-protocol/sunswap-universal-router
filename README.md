@@ -2,6 +2,14 @@
 
 Sunswap Universal Router is a unified routing smart contract for the SunSwap ecosystem, designed to efficiently route token swaps and liquidity across different pools and swap paths.
 
+Supported pool list:
+- SunSwap V4 Pools
+- SunSwap V3 Pools
+- SunSwap V2 Pools
+- SunSwap V1 Pools
+- SunSwap Curve Pools
+- HTX-SUN Fixed rate pool
+
 This repository contains the smart contracts, deployment scripts, and tests based on **Hardhat** and **Foundry**, with additional support for the **TRON** network.
 
 ---
