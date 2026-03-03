@@ -31,6 +31,12 @@ const config: HardhatUserConfig = {
       deploy: ['deploy/'],
     },
     tron: {
+      url: 'https://trongrid.io/jsonrpc',
+      tron: true,
+      deploy: ['deployTron/'],
+      accounts: [`${process.env.PRIVATE_KEY}`],
+    },
+    nile: {
       url: 'https://nile.trongrid.io/jsonrpc',
       tron: true,
       deploy: ['deployTron/'],
