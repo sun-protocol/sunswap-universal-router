@@ -13,7 +13,6 @@ This repository contains the smart contracts, deployment scripts, and tests base
   - EVM local development network (`localhost`)
   - TRON testnet (via `tronweb` and `tronSolc`)
 - **Gas / resource efficiency**: Solidity compiler optimization enabled (`runs=999999`, `viaIR: true`).
-- **Multi-language support**: Solidity (0.8.26) and Vyper (0.2.8 / 0.3.10).
 
 ---
 
