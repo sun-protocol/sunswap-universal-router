@@ -199,3 +199,14 @@ Contributions via Issues and Pull Requests are welcome.
 
 Unless otherwise specified, this project follows the open-source license used by the upstream repository (for example, MIT or a similar permissive license).  
 Before using it in production, please review the upstream repository and related license terms.
+
+---
+
+## Community & Support
+
+If you have questions about this project, find bugs, or would like to contribute, you can reach the team and community via:
+
+- [Telegram](https://t.me/SunIO_Defi)
+- [Twitter](https://twitter.com/defi_sunio)
+
+Please follow official announcements from these channels for the latest information on deployments, upgrades, and security notices.
