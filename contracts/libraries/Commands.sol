@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 /// @title Commands
 /// @notice Command Flags used to decode commands
@@ -19,7 +19,7 @@ library Commands {
     uint256 constant SWEEP = 0x04;
     // uint256 constant TRANSFER = 0x05;
     uint256 constant PAY_PORTION = 0x06;
-    // COMMAND_PLACEHOLDER = 0x07;
+    uint256 constant PAY_REFERRAL = 0x07;
 
     // Command Types where 0x08<=value<=0x0f, executed in the second nested-if block
     uint256 constant V2_SWAP_EXACT_IN = 0x08;
@@ -27,7 +27,7 @@ library Commands {
     uint256 constant PERMIT2_PERMIT = 0x0a;
     uint256 constant WRAP_ETH = 0x0b;
     uint256 constant UNWRAP_WETH = 0x0c;
-    uint256 constant PERMIT2_TRANSFER_FROM_BATCH = 0x0d;
+    // 0x0d removed (was PERMIT2_TRANSFER_FROM_BATCH)
     uint256 constant BALANCE_CHECK_ERC20 = 0x0e;
     // COMMAND_PLACEHOLDER = 0x0f;
 
@@ -45,6 +45,10 @@ library Commands {
     // COMMAND_PLACEHOLDER = 0x17 -> 0x20
 
     // Command Types where 0x21<=value<=0x3f
+    // EXECUTE_SUB_PLAN is intentionally not implemented in Dispatcher (it reverts as
+    // an invalid command type). Nested execute() would conflict with the once-per-tx
+    // PAY_REFERRAL guard backed by transient storage ONCE_SLOT, so the constant is
+    // retained for catalog completeness only.
     uint256 constant EXECUTE_SUB_PLAN = 0x21;
     uint256 constant STABLE_SWAP_EXACT_IN = 0x22;
     // uint256 constant STABLE_SWAP_EXACT_OUT = 0x23;
@@ -52,5 +56,5 @@ library Commands {
     uint256 constant PSM_SWAP_EXACT_OUT = 0x25;
     uint256 constant HTX_SUN_SWAP_IN = 0x26;
     uint256 constant HTX_SUN_SWAP_OUT = 0x27;
-    // COMMAND_PLACEHOLDER = 0x24 -> 0x3f
+    // COMMAND_PLACEHOLDER = 0x28 -> 0x3f
 }

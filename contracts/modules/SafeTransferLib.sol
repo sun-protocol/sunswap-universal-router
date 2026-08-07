@@ -3,10 +3,11 @@ pragma solidity >=0.4.22 <0.9.0;
 
 // helper methods for interacting with TRC20 tokens  that do not consistently return true/false
 library SafeTransferLib {
-    //TODO: Replace in deloy script
-    // nile:0xECa9bC828A3005B9a3b909f2cc5c2a54794DE05F  mainnet:0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C
-    // address constant USDTAddr = 0xECa9bC828A3005B9a3b909f2cc5c2a54794DE05F;
-    address constant USDTAddr = 0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C;
+    uint256 constant NILE_CHAIN_ID = 0xcd8690dc;
+    uint256 constant MAIN_CHAIN_ID = 0x2b6653dc;
+
+    address constant USDTNileAddr = 0xECa9bC828A3005B9a3b909f2cc5c2a54794DE05F;
+    address constant USDTMainAddr = 0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C;
 
     function safeApprove(
         address token,
@@ -23,9 +24,11 @@ library SafeTransferLib {
         address to,
         uint256 value
     ) internal returns (bool) {
-        // bytes4(keccak256(bytes('transfer(address,uint256)')));
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
-        if (token == USDTAddr) {
+
+        if ((token == USDTMainAddr) && (block.chainid == MAIN_CHAIN_ID)) {
+            return success;
+        } else if ((token == USDTNileAddr) && (block.chainid == NILE_CHAIN_ID)) {
             return success;
         }
         return (success && (data.length == 0 || abi.decode(data, (bool))));
@@ -37,14 +40,12 @@ library SafeTransferLib {
         address to,
         uint256 value
     ) internal returns (bool) {
-        // bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, to, value));
         return (success && (data.length == 0 || abi.decode(data, (bool))));
     }
 
-    function safeTransferETH(address to, uint256 value) internal {
+    function safeTransferETH(address to, uint256 value) internal returns (bool) {
         (bool success, ) = to.call{value: value}("");
-        //(bool success,)  = to.call{value:value}(new bytes(0));
-        require(success, "TransferHelper: ETH_TRANSFER_FAILED");
+        return success;
     }
 }

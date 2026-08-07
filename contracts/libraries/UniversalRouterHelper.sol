@@ -377,4 +377,25 @@ library UniversalRouterHelper {
             return address(0);
         }
     }
+
+    /// @notice ensure the function is executed once
+    /// @dev used to prevent multiple calls to the same function
+
+    function ensureExecutedOnce() internal {
+        bytes32 slot = Constants.ONCE_SLOT;
+        assembly {
+            if tload(slot) {
+                revert(0, 0)
+            }
+            tstore(slot, 1)
+        }
+    }
+    /// @notice reset the once state
+    /// @dev used to reset the once state after the function is executed
+    function resetExecutedOnceSlot() internal {
+        bytes32 slot = Constants.ONCE_SLOT;
+        assembly {
+            tstore(slot, 0)
+        }
+    }
 }

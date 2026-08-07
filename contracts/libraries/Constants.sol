@@ -25,4 +25,7 @@ library Constants {
 
     /// @dev The minimum length of an encoding that contains 2 or more pools
     uint256 internal constant MULTIPLE_V3_POOLS_MIN_LENGTH = V3_POP_OFFSET + NEXT_V3_POOL_OFFSET;
+
+    /// @dev The slot for the once state, used to prevent reentrancy
+    bytes32 internal constant ONCE_SLOT = 0x542acce1295cc1bbd49c53da8dc97aad44faf95f7a0a80c91832846eeb335d32; //keccak256("transient.once.isActive")
 }

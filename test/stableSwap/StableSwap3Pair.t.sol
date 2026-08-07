@@ -63,13 +63,12 @@ contract StableSwap3PairTest is Test, DeployPermit2 {
         //     address token1;
         //     address LPContract;
         // }
-        IStableSwapFactory(stableInfo).setStableSwapThreePoolPairInfo(
+        IStableSwapFactory(stableInfo).setSwapPoolInfo(
             0x10101,
             address(stablepool),
-            token0,
-            token1,
-            token2,
-            address(0)
+            tokens,
+            address(0),
+            0
         );
 
         permit2 = IAllowanceTransfer(deployPermit2());
@@ -84,7 +83,7 @@ contract StableSwap3PairTest is Test, DeployPermit2 {
             v2InitCodeHash: bytes32(0),
             v3InitCodeHash: bytes32(0),
             stableFactory: stableInfo,
-            stableInfo: address(0),
+            
             v4Vault: address(0),
             v4ClPoolManager: address(0),
             v3NFTPositionManager: address(0),
@@ -114,41 +113,31 @@ contract StableSwap3PairTest is Test, DeployPermit2 {
     function test_SetStableSwap_OnlyOwner() public {
         address bob = makeAddr("bob");
         address newStableSwapFactory = makeAddr("newStableSwapFactory");
-        address newStableSwapInfo = makeAddr("newStableSwapInfo");
 
         // random user cannot set
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, bob));
         vm.startPrank(bob);
-        router.setStableSwap(newStableSwapFactory, newStableSwapInfo);
+        router.setStableSwap(newStableSwapFactory);
         vm.stopPrank();
 
         // owner can set - before
         assertEq(router.stableSwapFactory(), stableInfo);
-        assertEq(router.stableSwapInfo(), address(0));
 
         // owner can set
         vm.prank(router.owner());
         vm.expectEmit();
-        emit StableSwapRouter.SetStableSwap(newStableSwapFactory, newStableSwapInfo);
-        router.setStableSwap(newStableSwapFactory, newStableSwapInfo);
+        emit StableSwapRouter.SetStableSwap(newStableSwapFactory);
+        router.setStableSwap(newStableSwapFactory);
 
         // owner can set - after
         assertEq(router.stableSwapFactory(), newStableSwapFactory);
-        assertEq(router.stableSwapInfo(), newStableSwapInfo);
     }
 
     function test_SetStableSwap_EmptyAddress() public {
-        address newStableSwapFactory = makeAddr("newStableSwapFactory");
-        address newStableSwapInfo = makeAddr("newStableSwapInfo");
         vm.startPrank(router.owner());
 
-        // set empty address for factory
         vm.expectRevert();
-        router.setStableSwap(address(0), newStableSwapInfo);
-
-        // set empty address for info
-        vm.expectRevert();
-        router.setStableSwap(newStableSwapFactory, address(0));
+        router.setStableSwap(address(0));
 
         vm.stopPrank();
     }

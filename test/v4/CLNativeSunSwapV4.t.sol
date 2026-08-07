@@ -87,7 +87,6 @@ contract CLNativeSunSwapV4Test is BaseSunSwapV4 {
             v2InitCodeHash: bytes32(0),
             v3InitCodeHash: bytes32(0),
             stableFactory: address(0),
-            stableInfo: address(0),
             v4Vault: address(poolManager),
             v4ClPoolManager: address(poolManager),
             v3NFTPositionManager: address(0),
@@ -156,7 +155,7 @@ contract CLNativeSunSwapV4Test is BaseSunSwapV4 {
             ""
         );
         plan = Planner.init().add(Actions.CL_SWAP_EXACT_IN_SINGLE, abi.encode(params));
-        bytes memory data = plan.finalizeSwap(poolKey0.currency0, poolKey0.currency1, ActionConstants.MSG_SENDER);
+        bytes memory data = _finalizeSwap(plan, poolKey0.currency0, poolKey0.currency1, ActionConstants.MSG_SENDER);
 
         // call v4_swap
         bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.V4_SWAP)));
@@ -186,7 +185,7 @@ contract CLNativeSunSwapV4Test is BaseSunSwapV4 {
             ""
         );
         plan = Planner.init().add(Actions.CL_SWAP_EXACT_IN_SINGLE, abi.encode(params));
-        bytes memory data = plan.finalizeSwap(poolKey0.currency1, poolKey0.currency0, ActionConstants.MSG_SENDER);
+        bytes memory data = _finalizeSwap(plan, poolKey0.currency1, poolKey0.currency0, ActionConstants.MSG_SENDER);
 
         // call v4_swap
         bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.V4_SWAP)));

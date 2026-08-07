@@ -151,7 +151,6 @@ contract V3ToV4MigrationTest is BaseSunSwapV4, OldVersionHelper {
             v2InitCodeHash: bytes32(0),
             v3InitCodeHash: bytes32(0),
             stableFactory: address(0),
-            stableInfo: address(0),
             v4Vault: address(poolManager),
             v4ClPoolManager: address(poolManager),
             v3NFTPositionManager: address(v3Nfpm),

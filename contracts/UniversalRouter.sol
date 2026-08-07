@@ -15,10 +15,13 @@ import {PSMSwapRouter} from "./modules/sunswap/PSM/PSMSwapRouter.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {ActionConstants} from "v4-periphery/src/libraries/ActionConstants.sol";
+import {UniversalRouterHelper} from "./libraries/UniversalRouterHelper.sol";
 
 contract UniversalRouter is RouterImmutables, IUniversalRouter, Dispatcher, Pausable {
     address public safeVault;
+
     error InvalidSafeVault();
+    error InvalidReferralVault();
 
     constructor(RouterParameters memory params)
         RouterImmutables(params)
@@ -72,6 +75,7 @@ contract UniversalRouter is RouterImmutables, IUniversalRouter, Dispatcher, Paus
                 sweep(allTokens[i], safeVault, 0);
             }
         }
+        UniversalRouterHelper.resetExecutedOnceSlot();
     }
 
     function successRequired(bytes1 command) internal pure returns (bool) {
@@ -99,6 +103,11 @@ contract UniversalRouter is RouterImmutables, IUniversalRouter, Dispatcher, Paus
     function setSafeVault(address _safeVault) external onlyOwner {
         if (_safeVault == address(0)) revert InvalidSafeVault();
         safeVault = _safeVault;
+    }
+
+    function setReferralVault(address _referralVault) external onlyOwner {
+        if (_referralVault == address(0)) revert InvalidReferralVault();
+        referralVault = _referralVault;
     }
 
     function concat(address[] memory a, address[] memory b) internal pure returns (address[] memory result) {

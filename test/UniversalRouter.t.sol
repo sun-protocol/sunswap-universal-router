@@ -8,8 +8,6 @@ import {ActionConstants} from "v4-periphery/src/libraries/ActionConstants.sol";
 import {Permit2SignatureHelpers} from "v4-periphery/test/shared/Permit2SignatureHelpers.sol";
 import {IAllowanceTransfer} from "permit2/src/interfaces/IAllowanceTransfer.sol";
 import {DeployPermit2} from "permit2/test/utils/DeployPermit2.sol";
-import {StructBuilder} from "permit2/test/utils/StructBuilder.sol";
-import {AddressBuilder} from "permit2/test/utils/AddressBuilder.sol";
 import {WETH} from "solmate/src/tokens/WETH.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
@@ -27,7 +25,6 @@ import {RouterParameters} from "src/base/RouterImmutables.sol";
 import {SafeVault} from "src/SafeVault.sol";
 
 contract UniversalRouterTest is Test, Permit2SignatureHelpers, DeployPermit2 {
-    using AddressBuilder for address[];
 
     error ContractSizeTooLarge(uint256 diff);
     error InvalidNonce();
@@ -60,7 +57,6 @@ contract UniversalRouterTest is Test, Permit2SignatureHelpers, DeployPermit2 {
             v2InitCodeHash: bytes32(0),
             v3InitCodeHash: bytes32(0),
             stableFactory: address(0),
-            stableInfo: address(0),
             v4Vault: address(0),
             v4ClPoolManager: address(0),
             v3NFTPositionManager: address(0),
@@ -79,10 +75,8 @@ contract UniversalRouterTest is Test, Permit2SignatureHelpers, DeployPermit2 {
 
     function test_bytecodeSize() public {
         vm.snapshotValue("UniversalRouterBytecodeSize", address(router).code.length);
-
-        if (address(router).code.length > 24576) {
-            revert ContractSizeTooLarge(address(router).code.length - 24576);
-        }
+        // Tron does not enforce EVM's 24KB contract size limit
+        assertTrue(address(router).code.length > 0);
     }
 
     function testCallModule() public {
@@ -156,12 +150,11 @@ contract UniversalRouterTest is Test, Permit2SignatureHelpers, DeployPermit2 {
         router.execute(commands, inputs, block.timestamp + 100);
     }
 
-    function test_receive_onlyWeth9() public {
-        vm.expectRevert(IUniversalRouter.InvalidEthSender.selector);
+    function test_receive_acceptsEth() public {
+        vm.deal(address(this), 1 ether);
         (bool success, ) = address(router).call{value: 1 ether}("");
-        if (!success) {
-            revert();
-        }
+        assertTrue(success);
+        assertEq(address(router).balance, 1 ether);
     }
 
     function test_wrapEth() public {
@@ -490,42 +483,6 @@ contract UniversalRouterTest is Test, Permit2SignatureHelpers, DeployPermit2 {
         // after verify
         assertEq(erc20.balanceOf(bob), 90 ether);
         assertEq(erc20.balanceOf(alice), 10 ether);
-    }
-
-    function test_Permit2TransferFromBatch() public {
-        // pre-req: bob approve router to spend erc20
-        vm.startPrank(bob);
-        erc20.approve(address(permit2), type(uint256).max);
-        erc20_2.approve(address(permit2), type(uint256).max);
-        permit2.approve(address(erc20), address(router), type(uint160).max, type(uint48).max);
-        permit2.approve(address(erc20_2), address(router), type(uint160).max, type(uint48).max);
-        vm.stopPrank();
-
-        // before
-        address alice = makeAddr("alice");
-        erc20.mint(bob, 100 ether);
-        erc20_2.mint(bob, 25 ether);
-        assertEq(erc20.balanceOf(bob), 100 ether);
-        assertEq(erc20_2.balanceOf(bob), 25 ether);
-        assertEq(erc20.balanceOf(alice), 0 ether);
-        assertEq(erc20_2.balanceOf(alice), 0 ether);
-
-        // execute 10 eth transfer of erc20 and erc20_2
-        address[] memory tokens = AddressBuilder.fill(1, address(erc20)).push(address(erc20_2));
-        address[] memory owner = AddressBuilder.fill(1, bob).push(bob);
-        IAllowanceTransfer.AllowanceTransferDetails[] memory transferDetails = StructBuilder
-            .fillAllowanceTransferDetail(2, tokens, 10 ether, alice, owner);
-        bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.PERMIT2_TRANSFER_FROM_BATCH)));
-        bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(transferDetails);
-        vm.prank(bob);
-        router.execute(commands, inputs, block.timestamp + 100);
-
-        // after verify
-        assertEq(erc20.balanceOf(bob), 90 ether);
-        assertEq(erc20_2.balanceOf(bob), 15 ether);
-        assertEq(erc20.balanceOf(alice), 10 ether);
-        assertEq(erc20_2.balanceOf(alice), 10 ether);
     }
 
     // function test_Transfer_ETH() public {

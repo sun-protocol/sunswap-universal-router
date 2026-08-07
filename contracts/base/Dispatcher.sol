@@ -23,6 +23,7 @@ import {CalldataDecoder} from "v4-periphery/src/libraries/CalldataDecoder.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {ICLPoolManager} from "v4-core/src/interfaces/ICLPoolManager.sol";
 import {UniversalRouterHelper} from "../libraries/UniversalRouterHelper.sol";
+
 /// @title Decodes and Executes Commands
 /// @notice Called by the UniversalRouter contract to efficiently decode and execute a singular command
 abstract contract Dispatcher is
@@ -41,6 +42,7 @@ abstract contract Dispatcher is
     using CalldataDecoder for bytes;
 
     bool public enableRecipientCheck;
+    address public referralVault;
 
     error InvalidCommandType(uint256 commandType);
     error BalanceTooLow();
@@ -188,8 +190,20 @@ abstract contract Dispatcher is
                         }
                         Payments.payPortion(token, map(recipient), bips);
                         return (success, output, tokens);
-                    } else {
-                        // placeholder area for command 0x07
+                    } else if (command == Commands.PAY_REFERRAL) {
+                        // equivalent: abi.decode(inputs, (address, address, uint256))
+                        address token;
+                        address recipient;
+                        uint256 bips;
+                        assembly {
+                            token := calldataload(inputs.offset)
+                            recipient := calldataload(add(inputs.offset, 0x20))
+                            bips := calldataload(add(inputs.offset, 0x40))
+                        }
+                        UniversalRouterHelper.ensureExecutedOnce();
+                        Payments.payReferral(token, recipient, bips, referralVault);
+                        return (success, output, tokens);
+                    } else{
                         revert InvalidCommandType(command);
                     }
                 } else {
@@ -271,15 +285,6 @@ abstract contract Dispatcher is
                         address[] memory single = new address[](1);
                         single[0] = address(WETH9);
                         return (success, output, single);
-                    } else if (command == Commands.PERMIT2_TRANSFER_FROM_BATCH) {
-                        IAllowanceTransfer.AllowanceTransferDetails[] calldata batchDetails;
-                        (uint256 length, uint256 offset) = inputs.toLengthOffset(0);
-                        assembly {
-                            batchDetails.length := length
-                            batchDetails.offset := offset
-                        }
-                        permit2TransferFrom(batchDetails, msgSender());
-                        return (success, output, tokens);
                     } else if (command == Commands.BALANCE_CHECK_ERC20) {
                         // equivalent: abi.decode(inputs, (address, address, uint256))
                         address owner;
@@ -328,12 +333,12 @@ abstract contract Dispatcher is
                         v1SwapExactOutput(map(recipient), amountOut, amountInMax, path, payer);
                         return (success, output, tokens);
                     } else {
-                        // placeholder area for command 0x0f
+                        // removed/placeholder: 0x0d, 0x0f
                         revert InvalidCommandType(command);
                     }
                 }
             } else {
-                // 0x10 <= command < 0x21
+                // 0x12 <= command < 0x21
                 if (command == Commands.V4_SWAP) {
                     // pass the calldata provided to V4SwapRouter._executeActions (defined in BaseActionsRouter)
                     _executeActions(inputs);
@@ -341,7 +346,7 @@ abstract contract Dispatcher is
                     return (success, output, tokens);
                     // This contract MUST be approved to spend the token since its going to be doing the call on the position manager
                 } else {
-                    // placeholder area for commands 0x15-0x20
+                    // placeholder area for commands 0x13-0x20
                     revert InvalidCommandType(command);
                 }
             }
@@ -445,7 +450,7 @@ abstract contract Dispatcher is
                 htxSunSwapExactOutput(map(recipient), amountOut, amountInMax, path, flag, payer);
                 return (success, output, tokens);
             } else {
-                // placeholder area for commands 0x24-0x3f
+                // removed/placeholder: 0x23, 0x28-0x3f
                 revert InvalidCommandType(command);
             }
         }

@@ -94,7 +94,6 @@ contract CLSunSwapV4Test is BaseSunSwapV4 {
             v2InitCodeHash: bytes32(0),
             v3InitCodeHash: bytes32(0),
             stableFactory: address(0),
-            stableInfo: address(0),
             v4Vault: address(poolManager),
             v4ClPoolManager: address(poolManager),
             v3NFTPositionManager: address(0),
@@ -181,7 +180,7 @@ contract CLSunSwapV4Test is BaseSunSwapV4 {
             ""
         );
         plan = Planner.init().add(Actions.CL_SWAP_EXACT_IN_SINGLE, abi.encode(params));
-        bytes memory data = plan.finalizeSwap(poolKey0.currency0, poolKey0.currency1, ActionConstants.MSG_SENDER);
+        bytes memory data = _finalizeSwap(plan, poolKey0.currency0, poolKey0.currency1, ActionConstants.MSG_SENDER);
 
         // call v4_swap
         bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.V4_SWAP)));
@@ -218,7 +217,7 @@ contract CLSunSwapV4Test is BaseSunSwapV4 {
             0
         );
         plan = Planner.init().add(Actions.CL_SWAP_EXACT_IN, abi.encode(params));
-        bytes memory data = plan.finalizeSwap(currency0, currency1, ActionConstants.MSG_SENDER);
+        bytes memory data = _finalizeSwap(plan, currency0, currency1, ActionConstants.MSG_SENDER);
 
         // call v4_swap
         bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.V4_SWAP)));
@@ -262,7 +261,7 @@ contract CLSunSwapV4Test is BaseSunSwapV4 {
             0
         );
         plan = Planner.init().add(Actions.CL_SWAP_EXACT_IN, abi.encode(params));
-        bytes memory data = plan.finalizeSwap(currency0, currency2, ActionConstants.MSG_SENDER);
+        bytes memory data = _finalizeSwap(plan, currency0, currency2, ActionConstants.MSG_SENDER);
 
         // call v4_swap
         bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.V4_SWAP)));
@@ -292,7 +291,7 @@ contract CLSunSwapV4Test is BaseSunSwapV4 {
             ""
         );
         plan = Planner.init().add(Actions.CL_SWAP_EXACT_OUT_SINGLE, abi.encode(params));
-        bytes memory data = plan.finalizeSwap(poolKey0.currency0, poolKey0.currency1, ActionConstants.MSG_SENDER);
+        bytes memory data = _finalizeSwap(plan, poolKey0.currency0, poolKey0.currency1, ActionConstants.MSG_SENDER);
 
         // call v4_swap
         bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.V4_SWAP)));
@@ -329,7 +328,7 @@ contract CLSunSwapV4Test is BaseSunSwapV4 {
             amountOut * 2
         );
         plan = Planner.init().add(Actions.CL_SWAP_EXACT_OUT, abi.encode(params));
-        bytes memory data = plan.finalizeSwap(currency0, currency1, ActionConstants.MSG_SENDER);
+        bytes memory data = _finalizeSwap(plan, currency0, currency1, ActionConstants.MSG_SENDER);
 
         // call v4_swap
         bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.V4_SWAP)));
@@ -373,7 +372,7 @@ contract CLSunSwapV4Test is BaseSunSwapV4 {
             amountOut * 2
         );
         plan = Planner.init().add(Actions.CL_SWAP_EXACT_OUT, abi.encode(params));
-        bytes memory data = plan.finalizeSwap(currency0, currency2, ActionConstants.MSG_SENDER);
+        bytes memory data = _finalizeSwap(plan, currency0, currency2, ActionConstants.MSG_SENDER);
 
         // call v4_swap
         bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.V4_SWAP)));

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025 SunSwap
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import {Constants} from "../libraries/Constants.sol";
 import {ActionConstants} from "v4-periphery/src/libraries/ActionConstants.sol";
@@ -10,6 +10,7 @@ import {SafeTransferLib} from "./SafeTransferLib.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {ERC721} from "solmate/src/tokens/ERC721.sol";
 import {ERC1155} from "solmate/src/tokens/ERC1155.sol";
+import {IReferralVault} from "../interfaces/IReferralVault.sol";
 
 /// @title Payments contract
 /// @notice Performs various operations around the payment of ETH and tokens
@@ -28,7 +29,7 @@ abstract contract Payments is RouterImmutables {
     function pay(address token, address recipient, uint256 value) internal {
         if (token == Constants.ETH) {
             // recipient.safeTransferETH(value);
-            SafeTransferLib.safeTransferETH(recipient, value);
+            require(SafeTransferLib.safeTransferETH(recipient, value), "TransferHelper: ETH_TRANSFER_FAILED");
         } else {
             if (value == ActionConstants.CONTRACT_BALANCE) {
                 value = ERC20(token).balanceOf(address(this));
@@ -48,13 +49,43 @@ abstract contract Payments is RouterImmutables {
             uint256 balance = address(this).balance;
             uint256 amount = balance.calculatePortion(bips);
             // recipient.safeTransferETH(amount);
-            SafeTransferLib.safeTransferETH(recipient, amount);
+            require(SafeTransferLib.safeTransferETH(recipient, amount), "TransferHelper: ETH_TRANSFER_FAILED");
         } else {
             uint256 balance = ERC20(token).balanceOf(address(this));
             uint256 amount = balance.calculatePortion(bips);
             // ERC20(token).safeTransfer(recipient, amount);
             require(SafeTransferLib.safeTransfer(token, recipient, amount),"TransferHelper: TRANSFER_FAILED");
         }
+    }
+
+
+
+    /// @notice Pushes a bips-portion of this contract's `token` balance into the referral
+    ///         vault and books the rebate accrual.
+    /// @dev    The body is a strict 3-step ritual that the vault relies on for correct
+    ///         donation isolation:
+    ///           1. `updateLastTokenBalance` — snapshots vault.balance(token) BEFORE inflow,
+    ///              so any pre-existing vault balance (donations / residuals) is excluded
+    ///              from this round's delta.
+    ///           2. `payPortion`              — moves bips% of router's current balance into
+    ///              the vault. This is the only step that can reenter (via the user-supplied
+    ///              `token` contract); the vault's `updateLastTokenBalance` is `onlyRouter`,
+    ///              so a malicious token cannot shift the snapshot mid-transfer.
+    ///           3. `allocateReferral`        — vault recomputes a fresh snapshot, derives
+    ///              delta = current - lastTokenBalance == this round's payPortion only, and
+    ///              splits per current bips between the rebate recipient and protocol.
+    ///         All three calls MUST stay in this order; see ReferralVault.allocateReferral
+    ///         for the corresponding vault-side invariant.
+    function payReferral(
+        address token,
+        address rebateRecipient,
+        uint256 bips,
+        address referralVault
+    ) internal {
+        require(bips <= IReferralVault(referralVault).maxReferralBips(), "Bips exceeds maxReferralBips");
+        IReferralVault(referralVault).updateLastTokenBalance(token);
+        payPortion(token, referralVault, bips);
+        IReferralVault(referralVault).allocateReferral(token, rebateRecipient);
     }
 
     /// @notice Sweeps all of the contract's ERC20 or ETH to an address
@@ -66,7 +97,7 @@ abstract contract Payments is RouterImmutables {
         if (token == Constants.ETH) {
             balance = address(this).balance;
             if (balance < amountMinimum) revert InsufficientETH();
-            if (balance > 0) SafeTransferLib.safeTransferETH(recipient, balance);
+            if (balance > 0) require(SafeTransferLib.safeTransferETH(recipient, balance), "TransferHelper: ETH_TRANSFER_FAILED");
             // recipient.safeTransferETH(balance);
         } else {
             balance = ERC20(token).balanceOf(address(this));
@@ -104,7 +135,7 @@ abstract contract Payments is RouterImmutables {
         if (value > 0) {
             WETH9.withdraw(value);
             if (recipient != address(this)) {
-                SafeTransferLib.safeTransferETH(recipient, value);
+                require(SafeTransferLib.safeTransferETH(recipient, value), "TransferHelper: ETH_TRANSFER_FAILED");
                 // recipient.safeTransferETH(value);
             }
         }

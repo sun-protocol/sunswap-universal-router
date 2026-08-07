@@ -25,12 +25,14 @@ library SwapFlags {
         return flag & MASK_UINT16;
     }
 
+    uint256 internal constant POOL_CATEGORY_MASK = 0xFF00;
+
     function isBasePool(uint256 flag) internal pure returns (bool) {
-        return (flag & MASK_UINT16) == POOL_TYPE_STABLE_BASE_POOL;
+        return (flag & MASK_UINT16 & POOL_CATEGORY_MASK) == POOL_TYPE_STABLE_BASE_POOL;
     }
 
     function isMetaPool(uint256 flag) internal pure returns (bool) {
-        return (flag & MASK_UINT16) == POOL_TYPE_STABLE_META_POOL;
+        return (flag & MASK_UINT16 & POOL_CATEGORY_MASK) == POOL_TYPE_STABLE_META_POOL;
     }
 
     function isExactPool(uint256 flag) internal pure returns (bool) {

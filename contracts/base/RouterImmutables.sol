@@ -2,8 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
-import {IV3NonfungiblePositionManager} from
-    "v4-periphery/src/interfaces/external/IV3NonfungiblePositionManager.sol";
+import {IV3NonfungiblePositionManager} from "v4-periphery/src/interfaces/external/IV3NonfungiblePositionManager.sol";
 import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {IWETH9} from "v4-periphery/src/interfaces/external/IWETH9.sol";
@@ -63,7 +62,6 @@ contract RouterImmutables {
 
     /// @dev V4 CLPositionManager address
     IPositionManager public immutable V4_CL_POSITION_MANAGER;
-
 
     constructor(RouterParameters memory params) {
         PERMIT2 = IPermit2(params.permit2);
