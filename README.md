@@ -28,8 +28,8 @@ This repository contains the smart contracts, deployment scripts, and tests base
 
 | contract        | chain        | address                            |
 | :-------------- | :----------- | :--------------------------------- |
-| UniversalRouter | TRON Mainnet | TSJEtPuqHpvSaVnSwvCsngaeBxrGUzp95Q |
-|                 | NILE Testnet | TEgq4237arNE7jX74KCDkc1MXdZeWNkGVj |
+| UniversalRouter | TRON Mainnet | TQqgNg13s2DjvXhW1ky4v6TsR8wZGvb7Y4 |
+|                 | NILE Testnet | TLmHD2TJoGVEMkGiE1JzSwd6CEPa8jXumJ |
 
 ## Tech Stack
 
