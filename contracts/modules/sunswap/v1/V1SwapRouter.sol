@@ -12,7 +12,9 @@ import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {ActionConstants} from "v4-periphery/src/libraries/ActionConstants.sol";
 
-/// @title Router for SunSwap v2 Trades
+/// @title Router for SunSwap V1 swaps
+/// @dev Paths contain only the input and output currencies; Constants.ETH represents native TRX.
+/// Token-to-token swaps use TRX as an intermediate currency inside the exchanges.
 abstract contract V1SwapRouter is RouterImmutables, Permit2Payments {
     using SafeTransferLib for ERC20;
     error V1TooLittleReceived();
@@ -20,63 +22,13 @@ abstract contract V1SwapRouter is RouterImmutables, Permit2Payments {
     error V1InvalidPath();
     error V1InvalidExchange();
 
-    function _v1SwapExactIn(address[] calldata path, address recipient, address exchange, uint256 amountIn) private returns (uint256 amountOut) {
-        unchecked {
-            if (path.length < 2) revert V1InvalidPath();
-
-            // cached to save on duplicate operations
-            uint256 finalPairIndex = path.length - 1;
-            uint256 penultimatePairIndex = finalPairIndex - 1;
-            for(uint256 i; i < finalPairIndex; i++) {
-                (address input, address output) = (path[i], path[i + 1]);
-                if(exchange == address(0)) {
-                    exchange = IV1Factory(SUNSWAP_V1_FACTORY).getExchange(input == Constants.ETH ? output : input);
-                    if(exchange == address(0)) revert V1InvalidExchange();
-                }
-                if(input == Constants.ETH) {
-                    amountOut = ISunswapExchange(exchange).trxToTokenTransferInput{value: amountIn}(
-                        1, block.timestamp + 1, i < penultimatePairIndex ? address(this) : recipient
-                    );
-                } else if(output == Constants.ETH) {
-                    ERC20(input).safeApprove(exchange, amountIn);
-                    amountOut = ISunswapExchange(exchange).tokenToTrxTransferInput(
-                        amountIn, 1, block.timestamp + 1, i < penultimatePairIndex ? address(this) : recipient
-                    );
-                } else {
-                    ERC20(input).safeApprove(exchange, amountIn);
-                    amountOut = ISunswapExchange(exchange).tokenToTokenTransferInput(
-                        amountIn, 1, 1, block.timestamp + 1, i < penultimatePairIndex ? address(this) : recipient, output
-                    );
-                }
-                exchange = address(0); // reset exchange to fetch the next one in the next iteration
-            }
-        }
-            // (address input, address output) = (path[0], path[1]);
-            // if(input == Constants.ETH) {
-            //     address payable exchange =IV1Factory(SUNSWAP_V1_FACTORY).getExchange(output);
-            //     amountIn = address(this).balance;
-            //     if(exchange == address(0)) revert V1InvalidExchange();
-            //     amountOut = ISunswapExchange(exchange).trxToTokenTransferInput{value: amountIn}(
-            //         1, block.timestamp + 1, recipient
-            //     );
-            // } else if(output == Constants.ETH) {
-            //    address payable exchange =IV1Factory(SUNSWAP_V1_FACTORY).getExchange(input);
-            //     if(exchange == address(0)) revert V1InvalidExchange(); 
-            //     amountIn = ERC20(input).balanceOf(address(this));                   
-            //     ERC20(input).safeApprove(exchange, amountIn);
-            //     amountOut = ISunswapExchange(exchange).tokenToTrxTransferInput(
-            //        amountIn, 1, block.timestamp + 1, recipient
-            //     );
-            // }
-        // }
-    }
-
-    /// @notice Performs a SunSwap v2 exact input swap
-    /// @param recipient The recipient of the output tokens
-    /// @param amountIn The amount of input tokens for the trade
-    /// @param amountOutMinimum The minimum desired amount of output tokens
-    /// @param path The path of the trade as an array of token addresses
-    /// @param payer The address that will be paying the input
+    /// @notice Performs a SunSwap V1 exact input swap
+    /// @dev Checks the output using the recipient's balance increase. Native TRX must already be in the Router.
+    /// @param recipient The recipient of the output tokens or TRX
+    /// @param amountIn The input amount, or CONTRACT_BALANCE to use the Router's entire input currency balance
+    /// @param amountOutMinimum The minimum acceptable output amount
+    /// @param path The two distinct input and output currency addresses, in swap order
+    /// @param payer The input source; use address(this) for native TRX. Ignored when amountIn is CONTRACT_BALANCE
     function v1SwapExactInput(
         address recipient,
         uint256 amountIn,
@@ -84,39 +36,33 @@ abstract contract V1SwapRouter is RouterImmutables, Permit2Payments {
         address[] calldata path,
         address payer
     ) internal {
-        if( amountIn != ActionConstants.CONTRACT_BALANCE && payer != address(this)){
+        if (path.length != 2 || path[0] == path[1]) revert V1InvalidPath();
+
+        if (amountIn == ActionConstants.CONTRACT_BALANCE) {
+            amountIn = UniversalRouterHelper.getBalance(path[0], address(this));
+        } else if (payer != address(this)) {
             payOrPermit2Transfer(path[0], payer, address(this), amountIn);
-        }else if (amountIn == ActionConstants.CONTRACT_BALANCE) {
-            address tokenIn = path[0];
-            if(tokenIn == Constants.ETH){
-                amountIn = address(this).balance;
-            } else {
-                amountIn = ERC20(tokenIn).balanceOf(address(this));
-            }
         }
         
-        uint256 balanceBefore;
-        uint256 amountOut;
-        if(path[path.length - 1] == Constants.ETH) {
-            balanceBefore = address(recipient).balance;
-            _v1SwapExactIn(path, recipient, address(0),amountIn);
-            amountOut = address(recipient).balance - balanceBefore;
-        }else {
-            ERC20 tokenOut = ERC20(path[path.length - 1]);
-            balanceBefore = tokenOut.balanceOf(recipient);
-            _v1SwapExactIn(path, recipient, address(0),amountIn);
-            amountOut = tokenOut.balanceOf(recipient) - balanceBefore;
-        }
+        address tokenOut = path[1];
+        uint256 balanceBefore = UniversalRouterHelper.getBalance(tokenOut, recipient);
+
+        _v1SwapExactIn(path, recipient, amountIn);
+
+        uint256 balanceAfter = UniversalRouterHelper.getBalance(tokenOut, recipient);
+        uint256 amountOut = balanceAfter - balanceBefore;
 
         if (amountOut < amountOutMinimum) revert V1TooLittleReceived();
     }
 
-    /// @notice Performs a SunSwap v2 exact output swap
-    /// @param recipient The recipient of the output tokens
-    /// @param amountOut The amount of output tokens to receive for the trade
-    /// @param amountInMaximum The maximum desired amount of input tokens
-    /// @param path The path of the trade as an array of token addresses
-    /// @param payer The address that will be paying the input
+    /// @notice Performs a SunSwap V1 exact output swap
+    /// @dev Native TRX must already be in the Router. Unspent input remains available for subsequent commands;
+    /// append a refund command before the Router's final safeVault sweep to return it to the user.
+    /// @param recipient The recipient of the output tokens or TRX
+    /// @param amountOut The requested output amount
+    /// @param amountInMaximum The maximum acceptable input amount
+    /// @param path The two distinct input and output currency addresses, in swap order
+    /// @param payer The address supplying input tokens; must be address(this) for native TRX input
     function v1SwapExactOutput(
         address recipient,
         uint256 amountOut,
@@ -124,20 +70,105 @@ abstract contract V1SwapRouter is RouterImmutables, Permit2Payments {
         address[] calldata path,
         address payer
     ) internal {
-        (uint256 amountIn, address firstPair) = UniversalRouterHelper.getAmountInMultihopV1(
-            SUNSWAP_V1_FACTORY, path, amountOut
-        );
+        // Keep only the input and output currencies; exchanges handle the intermediate TRX for token-to-token swaps.
+        // Distinct endpoints prevent reuse of the same exchange in that internal route.
+        if (path.length != 2 || path[0] == path[1]) revert V1InvalidPath();
+
+        address tokenIn = path[0];
+        (uint256 amountIn, address exchange, uint256 trxRequired) = _getV1AmountIn(path, amountOut);
         if (amountIn > amountInMaximum) revert V1TooMuchRequested();
 
-        if(path[0] == Constants.ETH){
-            if(address(this).balance < amountIn) revert V1TooMuchRequested();
-        } else if(payer != address(this)){
-            payOrPermit2Transfer(path[0], payer, address(this), amountIn);
-        } else {
-            if (ERC20(path[0]).balanceOf(address(this)) < amountIn) {
+        if (payer == address(this)) {
+            if (UniversalRouterHelper.getBalance(tokenIn, address(this)) < amountIn) {
                 revert V1TooMuchRequested();
             }
+        } else {
+            payOrPermit2Transfer(tokenIn, payer, address(this), amountIn);
         }
-        _v1SwapExactIn(path, recipient, firstPair,amountIn);
+        _v1SwapExactOut(path, recipient, exchange, amountOut, amountIn, trxRequired);
+    }
+
+    /// @dev Quotes the required input using the exchanges' exact output prices.
+    /// The caller must validate that the path contains two distinct currency addresses.
+    /// @return amountIn The required input amount
+    /// @return exchange The exchange to call: the output token's exchange for TRX input, otherwise the input token's
+    /// @return trxRequired The intermediate TRX required for token-to-token swaps; zero for other directions
+    function _getV1AmountIn(address[] calldata path, uint256 amountOut)
+        private view returns (uint256 amountIn, address exchange, uint256 trxRequired)
+    {
+        address tokenIn = path[0];
+        address tokenOut = path[1];
+        exchange = IV1Factory(SUNSWAP_V1_FACTORY).getExchange(tokenIn == Constants.ETH ? tokenOut : tokenIn);
+        if (exchange == address(0)) revert V1InvalidExchange();
+
+        if (tokenIn == Constants.ETH) {
+            amountIn = ISunswapExchange(exchange).getTrxToTokenOutputPrice(amountOut);
+        } else if (tokenOut == Constants.ETH) {
+            amountIn = ISunswapExchange(exchange).getTokenToTrxOutputPrice(amountOut);
+        } else {
+            // Token-to-token swaps bridge through TRX: quote the output pool first.
+            address outputExchange = IV1Factory(SUNSWAP_V1_FACTORY).getExchange(tokenOut);
+            if (outputExchange == address(0)) revert V1InvalidExchange();
+            trxRequired = ISunswapExchange(outputExchange).getTrxToTokenOutputPrice(amountOut);
+            amountIn = ISunswapExchange(exchange).getTokenToTrxOutputPrice(trxRequired);
+        }
+    }
+
+    /// @dev Executes an exact input swap using funds held by the Router.
+    /// The caller must validate the path and check the recipient's output against the requested minimum.
+    function _v1SwapExactIn(address[] calldata path, address recipient, uint256 amountIn) private {
+        (address input, address output) = (path[0], path[1]);
+        address exchange = IV1Factory(SUNSWAP_V1_FACTORY).getExchange(input == Constants.ETH ? output : input);
+        if (exchange == address(0)) revert V1InvalidExchange();
+
+        if (input == Constants.ETH) {
+            ISunswapExchange(exchange).trxToTokenTransferInput{value: amountIn}(
+                1, block.timestamp + 1, recipient
+            );
+        } else {
+            ERC20(input).safeApprove(exchange, amountIn);
+            if (output == Constants.ETH) {
+                ISunswapExchange(exchange).tokenToTrxTransferInput(
+                    amountIn, 1, block.timestamp + 1, recipient
+                );
+            } else {
+                ISunswapExchange(exchange).tokenToTokenTransferInput(
+                    amountIn, 1, 1, block.timestamp + 1, recipient, output
+                );
+            }
+        }
+    }
+
+    /// @dev Executes an exact output swap using Router funds and the limits returned by _getV1AmountIn.
+    /// The caller must validate the path and fund the Router. Any unused token allowance is cleared after the swap.
+    function _v1SwapExactOut(
+        address[] calldata path,
+        address recipient,
+        address exchange,
+        uint256 amountOut,
+        uint256 amountIn,
+        uint256 trxRequired
+    ) private {
+        address tokenIn = path[0];
+        address tokenOut = path[1];
+        uint256 actualAmountIn;
+        if (tokenIn == Constants.ETH) {
+            actualAmountIn = ISunswapExchange(exchange).trxToTokenTransferOutput{value: amountIn}(
+                amountOut, block.timestamp + 1, recipient
+            );
+        } else {
+            ERC20(tokenIn).safeApprove(exchange, amountIn);
+            if (tokenOut == Constants.ETH) {
+                actualAmountIn = ISunswapExchange(exchange).tokenToTrxTransferOutput(
+                    amountOut, amountIn, block.timestamp + 1, recipient
+                );
+            } else {
+                actualAmountIn = ISunswapExchange(exchange).tokenToTokenTransferOutput(
+                    amountOut, amountIn, trxRequired, block.timestamp + 1, recipient, tokenOut
+                );
+            }
+            ERC20(tokenIn).safeApprove(exchange, 0);
+        }
+        if (actualAmountIn > amountIn) revert V1TooMuchRequested();
     }
 }

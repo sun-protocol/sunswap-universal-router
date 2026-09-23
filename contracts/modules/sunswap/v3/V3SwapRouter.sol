@@ -34,6 +34,9 @@ abstract contract V3SwapRouter is RouterImmutables, Permit2Payments, ISunSwapV3S
     /// @dev The maximum value that can be returned from #getSqrtRatioAtTick. Equivalent to getSqrtRatioAtTick(MAX_TICK)
     uint160 internal constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342;
 
+    /// @dev SunSwap V3 pools ignore failed transfers for mainnet USDT, so its actual delivery must be verified.
+    address internal constant USDT = 0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C;
+
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
         if (amount0Delta <= 0 && amount1Delta <= 0) revert V3InvalidSwap(); // swaps entirely within 0-liquidity regions are not supported
         (, address payer) = abi.decode(data, (bytes, address));
@@ -149,6 +152,12 @@ abstract contract V3SwapRouter is RouterImmutables, Permit2Payments, ISunSwapV3S
 
         zeroForOne = isExactIn ? tokenIn < tokenOut : tokenOut < tokenIn;
 
+        // Exact-output paths are encoded in reverse, so tokenIn is the token delivered by this hop.
+        address outputToken = isExactIn ? tokenOut : tokenIn;
+        bool verifyUSDTOutput = outputToken == USDT;
+        uint256 balanceBefore;
+        if (verifyUSDTOutput) balanceBefore = ERC20(outputToken).balanceOf(recipient);
+
         (amount0Delta, amount1Delta) = ISunSwapV3Pool(
             UniversalRouterHelper.computePoolAddress(
                 SUNSWAP_V3_DEPLOYER, SUNSWAP_V3_POOL_INIT_CODE_HASH, tokenIn, tokenOut, fee
@@ -160,5 +169,13 @@ abstract contract V3SwapRouter is RouterImmutables, Permit2Payments, ISunSwapV3S
             (zeroForOne ? MIN_SQRT_RATIO + 1 : MAX_SQRT_RATIO - 1),
             abi.encode(path, payer)
         );
+
+        if (verifyUSDTOutput) {
+            uint256 balanceAfter = ERC20(outputToken).balanceOf(recipient);
+            uint256 expectedAmountOut = uint256(-(zeroForOne ? amount1Delta : amount0Delta));
+            if (balanceAfter < balanceBefore || balanceAfter - balanceBefore < expectedAmountOut) {
+                revert V3InvalidAmountOut();
+            }
+        }
     }
 }

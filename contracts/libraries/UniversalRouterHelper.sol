@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
-import {ISunswapExchange} from "../modules/sunswap/v1/interfaces/ISunswapExchange.sol";
-import {IV1Factory} from "../modules/sunswap/v1/interfaces/IV1Factory.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ISunSwapV2Pair} from "../modules/sunswap/v2/interfaces/ISunSwapV2Pair.sol";
 import {ISunSwapV3Pool} from "../modules/sunswap/v3/interfaces/ISunSwapV3Pool.sol";
 import {IStableSwapFactory} from "../interfaces/IStableSwapFactory.sol";
@@ -11,6 +8,7 @@ import {Constants} from "./Constants.sol";
 import {CalldataDecoder} from "v4-periphery/src/libraries/CalldataDecoder.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {Actions} from "v4-periphery/src/libraries/Actions.sol";
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
 
 library UniversalRouterHelper {
     using BytesLib for bytes;
@@ -19,6 +17,14 @@ library UniversalRouterHelper {
     error InvalidPoolLength();
     error InvalidReserves();
     error InvalidPath();
+
+    /// @notice Returns an account's native TRX or token balance
+    /// @param token The token address, or Constants.ETH for native TRX
+    /// @param account The account whose balance is queried
+    /// @return balance The account's balance in the currency's smallest units
+    function getBalance(address token, address account) internal view returns (uint256 balance) {
+        return token == Constants.ETH ? account.balance : ERC20(token).balanceOf(account);
+    }
 
     /**
      * Stable *************************************************
@@ -42,27 +48,6 @@ library UniversalRouterHelper {
     {
         (i, j, swapContract, extension) = IStableSwapFactory(stableSwapFactory).getStableInfo(input, output, flag);
     }
-
-    // function getStableAmountsIn(
-    //     address stableSwapFactory,
-    //     address stableSwapInfo,
-    //     address[] calldata path,
-    //     uint256[] calldata flag,
-    //     uint256 amountOut
-    // ) internal view returns (uint256[] memory amounts) {
-    //     uint256 length = path.length;
-    //     if (length < 2) revert InvalidPoolLength();
-
-    //     amounts = new uint256[](length);
-    //     amounts[length - 1] = amountOut;
-
-    //     for (uint256 i = length - 1; i > 0; i--) {
-    //         uint256 last = i - 1;
-    //         (uint256 k, uint256 j, address swapContract) =
-    //             getStableInfo(stableSwapFactory, path[last], path[i], flag[last]);
-    //         amounts[last] = IStableSwapInfo(stableSwapInfo).get_dx(swapContract, k, j, amounts[i], type(uint256).max);
-    //     }
-    // }
 
     /**
      * V2 *************************************************
@@ -159,46 +144,6 @@ library UniversalRouterHelper {
         (pair, token0) = pairAndToken0For(factory, initCodeHash, tokenA, tokenB);
         (uint256 reserve0, uint256 reserve1, ) = ISunSwapV2Pair(pair).getReserves();
         (reserveA, reserveB) = tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
-    }
-
-    function exchangeAndReservesFor(
-        address factory,
-        address tokenA,
-        address tokenB
-    )
-        internal
-        view
-        returns (
-            address exchange,
-            uint256 reserveA,
-            uint256 reserveB
-        )
-    {
-        if (tokenA == Constants.ETH) {
-            exchange = IV1Factory(factory).getExchange(tokenB);
-            reserveA = exchange.balance;
-            reserveB = IERC20(tokenB).balanceOf(exchange);
-        } else {
-            exchange = IV1Factory(factory).getExchange(tokenA);
-            reserveA = IERC20(tokenA).balanceOf(exchange);
-            reserveB = exchange.balance;
-        }
-    }
-
-    function getAmountInMultihopV1(
-        address factory,
-        address[] calldata path,
-        uint256 amountOut
-    ) internal view returns (uint256 amount, address exchange) {
-        if (path.length < 2) revert InvalidPath();
-        amount = amountOut;
-        for (uint256 i = path.length - 1; i > 0; i--) {
-            uint256 reserveIn;
-            uint256 reserveOut;
-
-            (exchange, reserveIn, reserveOut) = exchangeAndReservesFor(factory, path[i - 1], path[i]);
-            amount = getAmountIn(amount, reserveIn, reserveOut);
-        }
     }
 
     /// @notice Given an input asset amount returns the maximum output amount of the other asset
