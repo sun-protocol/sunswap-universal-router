@@ -5,7 +5,7 @@ echo "Cloning v4-core..."
 git clone --branch v1.0.0 git@g.teches.link:sunio/exchange/contract/v4-core.git ./lib/v4-core
 
 echo "Cloning sunswap-v4-periphery..."
-git clone --branch v1.0.0 git@g.teches.link:sunio/exchange/contract/sunswap-v4-periphery.git ./lib/sunswap-v4-periphery
+git clone --branch fix/exact_output_partial_fills git@g.teches.link:sunio/exchange/contract/sunswap-v4-periphery.git ./lib/sunswap-v4-periphery
 
 echo "Cloning sunswap-permit2..."
 git clone --branch v1.0.0 git@g.teches.link:sunio/exchange/contract/sunswap-permit2.git ./lib/sunswap-permit2
