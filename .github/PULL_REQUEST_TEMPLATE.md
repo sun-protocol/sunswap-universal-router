@@ -17,9 +17,10 @@ For a release, verify reproducibility and relevant integration/regression covera
 ## Review and release checklist
 
 - [ ] The target branch follows CONTRIBUTING.md.
+- [ ] For a release import, the `sync/*` branch targets `main` directly.
 - [ ] Only approved, public-safe content is included; intentional differences are documented.
 - [ ] Relevant checks pass and limitations are disclosed.
 - [ ] Two non-author reviewers approve the final revision.
 - [ ] All review conversations and blocking feedback are resolved.
-- [ ] The merger is authorized for the target branch: `contract-dev` or `contract-maintain` for `release/*`; only `contract-maintain` for `main` or retained `develop`.
+- [ ] The merger is authorized for the target branch: only `contract-maintain` for `main` or retained `develop`; `contract-dev` or `contract-maintain` for maintenance of retained `release/*` branches.
 - [ ] Tags, GitHub releases, deployments, and package publications are tracked separately, if applicable.
