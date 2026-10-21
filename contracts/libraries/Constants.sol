@@ -4,6 +4,9 @@ pragma solidity ^0.8.0;
 /// @title Constant state
 /// @notice Constant state used by the Universal Router
 library Constants {
+    /// @dev TRON mainnet USDT address
+    address internal constant USDT = 0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C;
+
     /// @dev Used for identifying cases when a v2 pair has already received input tokens
     uint256 internal constant ALREADY_PAID = 0;
 

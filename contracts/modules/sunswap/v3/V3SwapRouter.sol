@@ -12,6 +12,7 @@ import {UniversalRouterHelper} from "../../../libraries/UniversalRouterHelper.so
 import {RouterImmutables} from "../../../base/RouterImmutables.sol";
 import {Permit2Payments} from "../../Permit2Payments.sol";
 import {MaxInputAmount} from "../../../libraries/MaxInputAmount.sol";
+import {V3USDTInputAmount} from "../../../libraries/V3USDTInputAmount.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {CalldataDecoder} from "v4-periphery/src/libraries/CalldataDecoder.sol";
 
@@ -128,7 +129,13 @@ abstract contract V3SwapRouter is RouterImmutables, Permit2Payments, ISunSwapV3S
         bytes calldata path,
         address payer
     ) internal {
+        // Exact-output paths are reversed: the first token is the final output.
+        bool verifyUSDTOutput = path.decodeFirstToken() == Constants.USDT;
+        uint256 balanceBefore;
+        if (verifyUSDTOutput) balanceBefore = ERC20(Constants.USDT).balanceOf(recipient);
+
         MaxInputAmount.set(amountInMaximum);
+        V3USDTInputAmount.set(0);
         (int256 amount0Delta, int256 amount1Delta, bool zeroForOne) =
             _swap(-amountOut.toInt256(), recipient, path, payer, false);
 
@@ -136,6 +143,14 @@ abstract contract V3SwapRouter is RouterImmutables, Permit2Payments, ISunSwapV3S
 
         if (amountOutReceived != amountOut) revert V3InvalidAmountOut();
 
+        if (verifyUSDTOutput) {
+            // For a USDT round trip, undo this recipient's actual input payment
+            // before measuring delivery. Other payers/tokens must not be credited.
+            uint256 inputAdjustment = payer == recipient ? V3USDTInputAmount.get() : 0;
+            _checkOutputBalance(Constants.USDT, recipient, balanceBefore, amountOut, inputAdjustment);
+        }
+
+        V3USDTInputAmount.set(0);
         MaxInputAmount.set(0);
     }
 
@@ -149,6 +164,10 @@ abstract contract V3SwapRouter is RouterImmutables, Permit2Payments, ISunSwapV3S
 
         zeroForOne = isExactIn ? tokenIn < tokenOut : tokenOut < tokenIn;
 
+        bool tokenOutIsUSDT = tokenOut == Constants.USDT;
+        uint256 balanceBefore;
+        if (isExactIn && tokenOutIsUSDT) balanceBefore = ERC20(Constants.USDT).balanceOf(recipient);
+
         (amount0Delta, amount1Delta) = ISunSwapV3Pool(
             UniversalRouterHelper.computePoolAddress(
                 SUNSWAP_V3_DEPLOYER, SUNSWAP_V3_POOL_INIT_CODE_HASH, tokenIn, tokenOut, fee
@@ -160,5 +179,30 @@ abstract contract V3SwapRouter is RouterImmutables, Permit2Payments, ISunSwapV3S
             (zeroForOne ? MIN_SQRT_RATIO + 1 : MAX_SQRT_RATIO - 1),
             abi.encode(path, payer)
         );
+
+        // Only the deepest exact-output swap spends the original payer's input.
+        // Outer hops return intermediate amounts and must not overwrite this value.
+        if (!isExactIn && !path.hasMultiplePools()) {
+            // Here the reversed path's tokenOut is the original input token.
+            V3USDTInputAmount.set(tokenOutIsUSDT ? uint256(zeroForOne ? amount0Delta : amount1Delta) : 0);
+        }
+
+        if (isExactIn && tokenOutIsUSDT) {
+            uint256 expectedAmountOut = uint256(-(zeroForOne ? amount1Delta : amount0Delta));
+            _checkOutputBalance(tokenOut, recipient, balanceBefore, expectedAmountOut, 0);
+        }
+    }
+
+    function _checkOutputBalance(
+        address token,
+        address recipient,
+        uint256 balanceBefore,
+        uint256 expectedAmountOut,
+        uint256 inputAdjustment
+    ) private view {
+        uint256 balanceAfter = ERC20(token).balanceOf(recipient) + inputAdjustment;
+        if (balanceAfter < balanceBefore || balanceAfter - balanceBefore < expectedAmountOut) {
+            revert V3InvalidAmountOut();
+        }
     }
 }
