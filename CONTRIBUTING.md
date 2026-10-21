@@ -18,34 +18,38 @@ functional changes must retain an auditable internal release origin.
 
 ## Branch model
 
-The default branch is `main`. An existing `develop` branch is retained for
-history, not used for new development or release integration, and must not be deleted
+The default branch is `main`. Synchronize an approved internal release through one
+`sync/*` PR directly into `main`. Existing `develop` and `release/*` branches are
+retained for history, not used for routine release staging, and must not be deleted
 or rewritten as part of this transition.
 
 | Branch | Purpose | Pull request target |
 | --- | --- | --- |
 | `main` | Reviewed public release source and release documentation | — |
-| `release/vX.Y.Z` | Staging and verification of a fixed internal release | `main` |
-| `sync/<description>` | Reviewed updates to an existing release branch | `release/vX.Y.Z` |
+| `sync/<release-or-description>` | Import an approved internal release or patch | `main` |
 | `docs/<description>` | GitHub-specific documentation and metadata | `main` |
+| `release/vX.Y.Z` | Retained historical release branch | No routine updates |
 | `develop` | Retained historical branch | No routine updates |
 
-Create a new release branch from GitHub `main`, then import the selected internal stable
-revision and open its release PR. Once protected, additional release-branch updates
-use a `sync/*` PR. Both the development team and the release-maintainer team may
-create `release/*` branches from GitHub `main`.
-Do not overwrite an existing release branch or retarget an existing PR without
-reviewing its purpose and coordinating with its author.
+Create `sync/vX.Y.Z` (or a descriptive `sync/*` branch) from the latest GitHub
+`main`, import the selected approved release increment, and open its PR directly
+into `main`. A staging `release/*` branch and a second release-to-main PR are not
+required. Internal release preparation and validation remain prerequisites.
+
+An existing unmerged `sync/*` PR targeting `release/*` may be retargeted to `main`
+after coordinating with its author and reviewing the resulting diff against `main`.
+Preserve GitHub-specific content and revalidate if the new integration changes
+tested behavior. Do not overwrite or delete historical branches during the transition.
 
 ## Review and merge policy
 
-The following policy applies to `main`, `release/*`, and any retained `develop` branch:
+The following policy applies to `main` and retained `release/*` or `develop` branches:
 
 - Changes must go through a PR; direct updates, force pushes, and branch deletion are prohibited.
 - At least **two reviewers other than the PR author** must approve the final changes.
 - Code-changing commits invalidate earlier approvals and require renewed review.
 - Resolve all review conversations and blocking feedback before merging.
-- Both `contract-dev` and `contract-maintain` may merge PRs targeting `release/*`.
+- Both `contract-dev` and `contract-maintain` may merge reviewed maintenance PRs targeting retained `release/*` branches.
 - Only `contract-maintain` may merge PRs targeting `main` or retained `develop`.
 - Merge authority does not waive approvals, validation, or review of the final revision.
 
@@ -54,9 +58,10 @@ conversation-resolution, force-push, and deletion rules for these branches, with
 review-rule bypass actors. Both `contract-dev` and `contract-maintain` may update
 `release/*` through PRs; only `contract-maintain` may update `main` or retained
 `develop` through PRs. These exceptions to update restrictions apply only through
-a PR and cannot bypass the separate review requirements. Both teams may create
-`release/*` branches from `main`; creation does not permit direct updates.
-The final `release/*` to `main` PR remains restricted to `contract-maintain`.
+a PR and cannot bypass the separate review requirements. Existing creation
+permissions for `release/*` remain in place but are not needed for the normal
+synchronization flow. The `sync/*` to `main` release PR is restricted to
+`contract-maintain` for merging.
 The development team can also push unprotected feature branches, open PRs, and
 participate in reviews. `main` is the default branch.
 This document and PR checkboxes do not themselves enforce GitHub permissions.
@@ -75,10 +80,11 @@ existing workflow results and disclose failures; local validation remains requir
 2. Compare that source with GitHub `main` and any existing release PRs. GitHub-specific
    package metadata, dependency locations, documentation, and workflows may intentionally
    differ. Reconcile these differences explicitly; do not mirror or force-push blindly.
-3. Import only the approved release content. Do not publish internal CI/deployment
+3. Create `sync/vX.Y.Z` from the latest GitHub `main` and import only the approved
+   release increment. Do not publish internal CI/deployment
    configuration, secrets, private data, or unrelated development history. If commit
    history cannot be published, use a reviewed content import and retain internal provenance.
-4. Open `release/vX.Y.Z` → `main`. Include a public-safe scope summary, source-version
+4. Open `sync/vX.Y.Z` → `main` directly. Include a public-safe scope summary, source-version
    provenance, validation results, intentional differences, and companion release order.
    Keep confidential source links and evidence in the internal release record.
 5. Complete the validation below and obtain two non-author approvals. An authorized
@@ -154,7 +160,7 @@ Use separately authorized release credentials and verify the destination before 
 ## Urgent fixes
 
 Fix the affected version through the internal hotfix process first. Once merged into the
-internal stable branch, synchronize the fixed patch release through a GitHub release PR
+internal stable branch, synchronize the fixed patch release through a `sync/*` → `main` PR
 with the same approval and validation requirements. Do not quietly create a second
 source of truth by applying functional fixes only on GitHub. Track any deployment,
 consumer upgrade, and return of the fix to the internal active branches separately.
